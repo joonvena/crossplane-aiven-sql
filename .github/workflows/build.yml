@@ -1,0 +1,43 @@
+name: build
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+    - name: Test
+      run: |
+        [ $(uname -m) = x86_64 ] && curl -Lo kind https://kind.sigs.k8s.io/dl/v0.20.0/kind-linux-amd64
+        chmod +x kind
+        mv kind /usr/local/bin
+        curl -sLO https://dl.k8s.io/release/v1.28.2/bin/linux/amd64/kubectl
+        chmod +x kubectl
+        mv kubectl /usr/local/bin
+        curl -sLO https://get.helm.sh/helm-v3.13.0-linux-amd64.tar.gz
+        tar -zxvf helm-v3.13.0-linux-amd64.tar.gz
+        chmod +x linux-amd64/helm
+        mv linux-amd64/helm /usr/local/bin/helm
+        curl -sLo kubectl-kuttl https://github.com/kudobuilder/kuttl/releases/download/v0.15.0/kubectl-kuttl_0.15.0_linux_x86_64
+        chmod +x kubectl-kuttl
+        mv kubectl-kuttl /usr/local/bin
+        helm repo add crossplane-stable https://charts.crossplane.io/stable
+        kubectl kuttl test --start-kind --skip-delete --skip-cluster-delete --timeout 120 tests/
+    - name: Build
+      run: |
+        curl -sLo crossplane https://releases.crossplane.io/stable/v1.9.2/bin/linux_amd64/crank
+        chmod +x crossplane
+        mv crossplane /usr/local/bin
+        cd package
+        crossplane build configuration
+        if [ "${{ github.ref }}" = "refs/heads/main" ]; then
+          echo ${{ secrets.DOCKERHUB_TOKEN }} | docker login --username joonvena --password-stdin
+          crossplane push configuration joonvena/aiven-sql:${{ github.sha }}
+        fi

@@ -1,0 +1,11 @@
+apiVersion: storage.polarsquad.com/v1alpha1
+kind: Database
+metadata:
+  name: ps-demo-mysql
+spec:
+  parameters:
+    name: ps-demo
+  compositionSelector:
+    matchLabels:
+      provider: aiven
+      engine: mysql

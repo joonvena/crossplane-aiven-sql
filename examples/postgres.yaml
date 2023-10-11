@@ -1,0 +1,12 @@
+apiVersion: storage.polarsquad.com/v1alpha1
+kind: Database
+metadata:
+  name: ps-demo-postgres
+spec:
+  parameters:
+    name: ps-demo
+    pgVersion: "13"
+  compositionSelector:
+    matchLabels:
+      provider: aiven
+      engine: postgres

@@ -1,0 +1,10 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestSuite
+testDirs:
+  - ./tests/
+commands:
+  - command: helm upgrade --install crossplane crossplane-stable/crossplane --namespace crossplane-system --create-namespace --wait --values tests/values.yaml
+  - command: kubectl wait --for condition=healthy --timeout=150s provider/upbound-provider-terraform
+  - command: kubectl apply -f tests/init
+  - command: kubectl apply -f package/definition.yaml
+

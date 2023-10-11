@@ -1,0 +1,25 @@
+apiVersion: tf.upbound.io/v1beta1
+kind: Workspace
+metadata:
+  name: ps-demo-postgres
+  labels:
+    crossplane.io/claim-name: ps-demo-postgres
+    crossplane.io/claim-namespace: default
+spec:
+  deletionPolicy: Delete
+  forProvider:
+    vars:
+    - key: databaseName
+      value: ps-demo
+    - key: pgVersion
+      value: "13"
+  writeConnectionSecretToRef:
+    name: ps-demo-postgres-db-credentials
+    namespace: default
+status:
+  atProvider:
+    outputs:
+      database_name: ps-demo
+      database_user: ps-demo
+      engine: postgres
+      provider: aiven

@@ -1,0 +1,54 @@
+apiVersion: apiextensions.crossplane.io/v1
+kind: CompositeResourceDefinition
+metadata:
+  name: xdatabases.storage.polarsquad.com
+spec:
+  defaultCompositionRef:
+    name: postgres-aiven
+  group: storage.polarsquad.com
+  names:
+    kind: XDatabase
+    plural: xdatabases
+  claimNames:
+    kind: Database
+    plural: databases
+  versions:
+  - name: v1alpha1
+    referenceable: true
+    served: true
+    schema:
+      openAPIV3Schema:
+        type: object
+        properties:
+          spec:
+            type: object
+            properties:
+              parameters:
+                type: object
+                properties:
+                  name:
+                    type: string
+                    description: Name of the database
+                  pgVersion:
+                    type: string
+                    description: PostgreSQL version
+                    enum:
+                    - "12"
+                    - "13"
+                    - "14"
+                    - "15"
+                    default: "15"
+          status:
+            description: Freeform field to patch between resources
+            type: object
+            properties:
+              values:
+                type: object
+                x-kubernetes-preserve-unknown-fields: true
+    additionalPrinterColumns:
+    - name: provider
+      type: string
+      jsonPath: ".status.values.provider"
+    - name: engine
+      type: string
+      jsonPath: ".status.values.engine"
