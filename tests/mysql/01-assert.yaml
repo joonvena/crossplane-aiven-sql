@@ -1,0 +1,23 @@
+apiVersion: tf.upbound.io/v1beta1
+kind: Workspace
+metadata:
+  name: ps-demo-mysql
+  labels:
+    crossplane.io/claim-name: ps-demo-mysql
+    crossplane.io/claim-namespace: default
+spec:
+  deletionPolicy: Delete
+  forProvider:
+    vars:
+    - key: databaseName
+      value: ps-demo
+  writeConnectionSecretToRef:
+    name: ps-demo-mysql-db-credentials
+    namespace: default
+status:
+  atProvider:
+    outputs:
+      database_name: ps-demo
+      database_user: ps-demo
+      engine: mysql
+      provider: aiven

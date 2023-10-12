@@ -1,0 +1,3 @@
+provider:
+  packages:
+    - xpkg.upbound.io/upbound/provider-terraform:v0.10.0

@@ -1,0 +1,115 @@
+apiVersion: apiextensions.crossplane.io/v1
+kind: Composition
+metadata:
+  name: mysql-aiven
+  labels:
+    provider: aiven
+    engine: mysql
+spec:
+  compositeTypeRef:
+    apiVersion: storage.polarsquad.com/v1alpha1
+    kind: XDatabase
+  writeConnectionSecretsToNamespace: crossplane-system
+  resources:
+  - name: mysql-db
+    base:
+      apiVersion: tf.upbound.io/v1beta1
+      kind: Workspace
+      spec:
+        forProvider:
+          source: Inline
+          module: |
+            resource "aiven_mysql" "main" {
+              project = local.aiven_project
+              service_name = var.databaseName
+              plan = "free-1-5gb"
+            }
+
+            resource "aiven_mysql_database" "main" {
+              project = aiven_mysql.main.project
+              service_name = aiven_mysql.main.service_name
+              database_name = var.databaseName
+            }
+
+            resource "aiven_mysql_user" "main" {
+              project = aiven_mysql.main.project
+              service_name = aiven_mysql.main.service_name
+              username = var.databaseName
+            }
+
+            data "aiven_mysql_user" "main" {
+              project = aiven_mysql.main.project
+              service_name = aiven_mysql.main.service_name
+              username = aiven_mysql_user.main.username
+            }
+
+            output "database_name" {
+              value = aiven_mysql_database.main.database_name
+            }
+
+            output "database_host" {
+              value = aiven_mysql.main.service_host
+            }
+
+            output "database_port" {
+              value = aiven_mysql.main.service_port
+            }
+
+            output "database_user" {
+              value = aiven_mysql_user.main.username
+            }
+
+            output "database_password" {
+              value = data.aiven_mysql_user.main.password
+              sensitive = true
+            }
+
+            output "database_url" {
+              value = "mysql://${aiven_mysql_user.main.username}:${data.aiven_mysql_user.main.password}@${aiven_mysql.main.service_host}:${aiven_mysql.main.service_port}/${aiven_mysql_database.main.database_name}?ssl-mode=REQUIRED"
+              sensitive = true
+            }
+
+            output "provider" {
+              value = "aiven"
+            }
+            
+            output "engine" {
+              value = "mysql"
+            }
+
+            variable "databaseName" {
+              description = "Name of the database"
+              type = string
+            }
+          vars:
+          - key: databaseName
+    connectionDetails:
+    - fromConnectionSecretKey: database_url
+    - fromConnectionSecretKey: database_host
+    - fromConnectionSecretKey: database_port
+    - fromConnectionSecretKey: database_user
+    - fromConnectionSecretKey: database_password
+    - fromConnectionSecretKey: database_name
+    patches:
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.claimRef.name
+      toFieldPath: metadata.name
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.parameters.name
+      toFieldPath: spec.forProvider.vars[0].value
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.parameters.name
+      toFieldPath: spec.writeConnectionSecretToRef.name
+      transforms:
+        - type: string
+          string:
+            fmt: "%s-mysql-db-credentials"
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.claimRef.namespace
+      toFieldPath: spec.writeConnectionSecretToRef.namespace
+    - type: ToCompositeFieldPath
+      fromFieldPath: status.atProvider.outputs.provider
+      toFieldPath: status.values.provider
+    - type: ToCompositeFieldPath
+      fromFieldPath: status.atProvider.outputs.engine
+      toFieldPath: status.values.engine

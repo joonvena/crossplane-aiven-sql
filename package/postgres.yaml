@@ -1,0 +1,129 @@
+apiVersion: apiextensions.crossplane.io/v1
+kind: Composition
+metadata:
+  name: postgres-aiven
+  labels:
+    provider: aiven
+    engine: postgres
+spec:
+  compositeTypeRef:
+    apiVersion: storage.polarsquad.com/v1alpha1
+    kind: XDatabase
+  writeConnectionSecretsToNamespace: crossplane-system
+  resources:
+  - name: postgres-db
+    base:
+      apiVersion: tf.upbound.io/v1beta1
+      kind: Workspace
+      spec:
+        forProvider:
+          source: Inline
+          module: |
+            resource "aiven_pg" "main" {
+              project = local.aiven_project
+              service_name = var.databaseName
+              plan = "free-1-5gb"
+
+              pg_user_config {
+                pg_version = var.pgVersion
+              } 
+            }
+
+            resource "aiven_pg_database" "main" {
+              project = aiven_pg.main.project
+              service_name = aiven_pg.main.service_name
+              database_name = var.databaseName
+            }
+
+            resource "aiven_pg_user" "main" {
+              project = aiven_pg.main.project
+              service_name = aiven_pg.main.service_name
+              username = var.databaseName
+            }
+
+            data "aiven_pg_user" "main" {
+              project = aiven_pg.main.project
+              service_name = aiven_pg.main.service_name
+              username = aiven_pg_user.main.username
+            }
+
+            output "database_name" {
+              value = aiven_pg_database.main.database_name
+            }
+
+            output "database_host" {
+              value = aiven_pg.main.service_host
+            }
+
+            output "database_port" {
+              value = aiven_pg.main.service_port
+            }
+
+            output "database_user" {
+              value = aiven_pg_user.main.username
+            }
+
+            output "database_password" {
+              value = data.aiven_pg_user.main.password
+              sensitive = true
+            }
+
+            output "database_url" {
+              value = "postgres://${aiven_pg_user.main.username}:${data.aiven_pg_user.main.password}@${aiven_pg.main.service_host}:${aiven_pg.main.service_port}/${aiven_pg_database.main.database_name}?sslmode=require"
+              sensitive = true
+            }
+
+            output "provider" {
+              value = "aiven"
+            }
+            
+            output "engine" {
+              value = "postgres"
+            }
+
+            variable "databaseName" {
+              description = "Name of the database"
+              type = string
+            }
+
+            variable "pgVersion" {
+              description = "PostgreSQL version"
+              type = string
+            }
+          vars:
+          - key: databaseName
+          - key: pgVersion
+    connectionDetails:
+    - fromConnectionSecretKey: database_url
+    - fromConnectionSecretKey: database_host
+    - fromConnectionSecretKey: database_port
+    - fromConnectionSecretKey: database_user
+    - fromConnectionSecretKey: database_password
+    - fromConnectionSecretKey: database_name
+    patches:
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.claimRef.name
+      toFieldPath: metadata.name
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.parameters.name
+      toFieldPath: spec.forProvider.vars[0].value
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.parameters.pgVersion
+      toFieldPath: spec.forProvider.vars[1].value
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.parameters.name
+      toFieldPath: spec.writeConnectionSecretToRef.name
+      transforms:
+        - type: string
+          string:
+            fmt: "%s-postgres-db-credentials"
+    - type: FromCompositeFieldPath
+      fromFieldPath: spec.claimRef.namespace
+      toFieldPath: spec.writeConnectionSecretToRef.namespace
+    - type: ToCompositeFieldPath
+      fromFieldPath: status.atProvider.outputs.provider
+      toFieldPath: status.values.provider
+    - type: ToCompositeFieldPath
+      fromFieldPath: status.atProvider.outputs.engine
+      toFieldPath: status.values.engine
+
